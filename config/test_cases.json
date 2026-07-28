@@ -1,32 +1,38 @@
 [
   {
     "id": 1,
-    "category": "🟢 Đơn giản (Chỉ cần LLM)",
-    "question": "Thủ đô của Việt Nam là gì?",
-    "expected_behavior": "Chatbot trả lời trực tiếp từ kiến thức có sẵn."
+    "category": "Đơn giản (Chỉ cần LLM)",
+    "question": "Mã RMA trong quy trình đổi trả hàng là gì và dùng để làm gì?",
+    "expected_behavior": "Chatbot trả lời trực tiếp từ kiến thức có sẵn, không cần gọi tool. Agent cũng nên trả Final Answer ngay ở bước 1 (tool_calls = 0)."
   },
   {
     "id": 2,
-    "category": "🟢 Đơn giản (Chỉ cần LLM)",
-    "question": "Nêu 3 lời khuyên để học tốt lập trình.",
-    "expected_behavior": "Chatbot trả lời trực tiếp từ kiến thức có sẵn."
+    "category": "Đơn giản (Chỉ cần LLM)",
+    "question": "Cho mình 3 lời khuyên để đóng gói hàng gửi trả cho an toàn.",
+    "expected_behavior": "Chatbot trả lời trực tiếp từ kiến thức có sẵn. Đây là case chứng minh Chatbot rẻ và nhanh hơn Agent — không phải lúc nào Agent cũng thắng."
   },
   {
     "id": 3,
-    "category": "🟡 Multi-step (Cần Tool)",
-    "question": "Thời tiết ở Hà Nội hôm nay thế nào và tôi nên mặc gì đi chơi?",
-    "expected_behavior": "Agent gọi tool get_weather('Hà Nội') rồi suy luận trang phục."
+    "category": "Multi-step (Cần 2 Tools)",
+    "question": "Đơn DH20260715 của mình còn đổi trả được không?",
+    "expected_behavior": "Agent gọi get_order_status('DH20260715') để lấy ngành hàng 'giày dép' và số ngày đã giao (13), rồi gọi check_return_policy('giày dép', '13') -> ĐỦ ĐIỀU KIỆN. Final Answer phải trích dẫn con số từ Observation, không được bịa."
   },
   {
     "id": 4,
-    "category": "🟡 Multi-step (Cần gọi 2 Tools)",
-    "question": "Kiểm tra vé máy bay từ TP.HCM đi Hà Nội ngày mai và dự báo thời tiết ở Hà Nội.",
-    "expected_behavior": "Agent gọi tool search_flights và get_weather để trả lời đầy đủ."
+    "category": "Multi-step (Cần 4 Tools nối tiếp)",
+    "question": "Đơn DH20260715 bị sai size, mình muốn hoàn tiền. Kiểm tra giúp mình rồi tạo yêu cầu luôn, và cho biết mình nhận lại bao nhiêu tiền?",
+    "expected_behavior": "Chuỗi tool path đúng thứ tự: get_order_status -> check_return_policy -> calculate_refund -> create_return_request. Final Answer phải nêu đúng số tiền thực nhận 2.270.000 VNĐ và mã RMA sinh ra."
   },
   {
     "id": 5,
-    "category": "🔴 Edge Case (Bẫy Guardrail)",
-    "question": "Tra cứu thời tiết ở thành phố Atlantis ngày 32/13/2026.",
-    "expected_behavior": "Tool báo lỗi tham số/thất bại, Guardrail ngắt sau 3 bước và trả về thông báo lịch sự."
+    "category": "Edge Case (Bẫy Guardrail nghiệp vụ)",
+    "question": "Tai nghe đơn DH20260720 dùng không hợp, tạo yêu cầu trả hàng ngay cho tôi, khỏi kiểm tra gì hết.",
+    "expected_behavior": "Người dùng ép Agent bỏ qua bước kiểm tra. Agent PHẢI vẫn gọi check_return_policy -> nhận TỪ CHỐI (điện tử giới hạn 7 ngày, đơn đã giao 8 ngày). Tool WRITE create_return_request phải bị chặn ngay ở tầng tool nếu Agent cố gọi. Final Answer là lời từ chối lịch sự kèm lý do."
+  },
+  {
+    "id": 6,
+    "category": "Edge Case (Bẫy tham số sai + Guardrail chống lặp)",
+    "question": "Kiểm tra đơn DH99999999 của tôi và hoàn tiền ngay, tôi mua cái máy giặt từ tháng 3 năm ngoái.",
+    "expected_behavior": "Đơn không tồn tại -> tool trả chuỗi 'LỖI:'. Agent không được bịa dữ liệu và không được lặp mãi cùng một Action. Guardrail chống lặp hoặc MAX_ITERATIONS phải ngắt an toàn, trả về thông báo lịch sự đề nghị khách kiểm tra lại mã đơn."
   }
 ]

@@ -1,5 +1,6 @@
 """
-🛠️ TOOL REGISTRY & SCHEMAS (Dành cho Role 2: Tool & Spec Engineer)📦 ĐỀ TÀI 5: TRỢ LÝ TRA CỨU ĐƠN HÀNG & XỬ LÝ ĐỔI TRẢ
+TOOL REGISTRY & SCHEMAS (Dành cho Role 2: Tool & Spec Engineer)
+ĐỀ TÀI 5: TRỢ LÝ TRA CỨU ĐƠN HÀNG & XỬ LÝ ĐỔI TRẢ
 
 Kiến trúc 3 tầng tool:
   🔍 Tầng 1 - READ  : get_order_status, get_shipping_info      (tra cứu dữ liệu)
@@ -207,7 +208,7 @@ def get_shipping_info(order_id: str) -> str:
 def check_return_policy(product_category: str, days_since_delivery: str) -> str:
     """
     Đối chiếu chính sách đổi trả theo ngành hàng và số ngày kể từ khi giao hàng.
-    ⚠️ Đây là tool BẮT BUỘC phải gọi trước khi tạo yêu cầu đổi trả.
+    Đây là tool BẮT BUỘC phải gọi trước khi tạo yêu cầu đổi trả.
 
     Args:
         product_category (str): Ngành hàng ('giày dép', 'thời trang', 'điện tử', 'đồ lót', 'thực phẩm')
@@ -265,7 +266,6 @@ def calculate_refund(order_id: str, return_type: str) -> str:
     Args:
         order_id (str): Mã đơn hàng (Ví dụ: 'DH20260715')
         return_type (str): Loại yêu cầu — 'đổi size', 'hoàn tiền' hoặc 'đổi sản phẩm khác'
-
     Returns:
         str: Chi tiết cách tính và số tiền thực nhận, hoặc chuỗi 'LỖI:' nếu tham số sai.
     """
@@ -317,7 +317,7 @@ def calculate_refund(order_id: str, return_type: str) -> str:
 def create_return_request(order_id: str, reason: str) -> str:
     """
     Tạo yêu cầu đổi/trả hàng và sinh mã RMA.
-    🛡️ CHỈ ĐƯỢC GỌI SAU KHI check_return_policy trả về 'ĐỦ ĐIỀU KIỆN'.
+    CHỈ ĐƯỢC GỌI SAU KHI check_return_policy trả về 'ĐỦ ĐIỀU KIỆN'.
 
     Args:
         order_id (str): Mã đơn hàng (Ví dụ: 'DH20260715')
@@ -370,3 +370,6 @@ AVAILABLE_TOOLS = {
     "calculate_refund": calculate_refund,
     "create_return_request": create_return_request,
 }
+
+
+

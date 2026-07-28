@@ -1,0 +1,57 @@
+%% =====================================================================================
+%% HYBRID DECISION FLOWCHART — Khi nào đi Chatbot path, khi nào đi ReAct Agent path
+%% Đề tài 5: Trợ lý tra cứu đơn hàng & xử lý đổi trả
+%% Nguyên tắc: Agent đắt hơn Chatbot (nhiều LLM call hơn, chậm hơn) nên chỉ trả cái
+%% giá đó khi câu hỏi thật sự cần bằng chứng từ hệ thống hoặc cần thực hiện hành động.
+%% =====================================================================================
+
+flowchart TD
+    U([Câu hỏi của khách hàng]) --> R{Câu hỏi có nhắc tới<br/>dữ liệu riêng của khách?<br/>mã đơn, tiền hoàn, tình trạng giao}
+
+    R -- "Không: kiến thức chung<br/>(RMA là gì, đóng gói thế nào)" --> C[CHATBOT PATH<br/>1 LLM call - 0 tool]
+    C --> CANS([Trả lời ngay<br/>Nhanh và rẻ nhất])
+
+    R -- "Có" --> W{Khách yêu cầu THỰC HIỆN<br/>hành động thay đổi trạng thái?<br/>tạo yêu cầu đổi trả, huỷ đơn}
+
+    W -- "Không: chỉ tra cứu" --> A1[REACT AGENT PATH<br/>Tool tầng READ + RULE]
+    W -- "Có" --> A2[REACT AGENT PATH<br/>Bắt buộc đủ READ - RULE - WRITE]
+
+    A1 --> LOOP
+    A2 --> LOOP
+
+    subgraph LOOP ["VÒNG LẶP REACT - Thought / Action / Observation"]
+        direction TB
+        T[Thought: suy luận bước tiếp theo] --> ACT[Action: gọi tool]
+        ACT --> PARSE{Parser bóc được<br/>Action hợp lệ?}
+        PARSE -- "Không" --> PERR[Observation: LỖI ĐỊNH DẠNG<br/>đếm parse_errors]
+        PERR --> G
+        PARSE -- "Có" --> REP{Action lặp lại y hệt<br/>quá MAX_REPEATED_ACTIONS?}
+        REP -- "Có" --> G
+        REP -- "Không" --> EXEC[Executor chạy tool thật<br/>có timeout TIMEOUT_SECONDS]
+        EXEC --> OBS[Observation THẬT<br/>do application chèn vào<br/>LLM không được tự bịa]
+        OBS --> POL{Observation có phải<br/>TỪ CHỐI hoặc LỖI?}
+        POL -- "Có" --> T
+        POL -- "Không, đã đủ bằng chứng" --> FIN[Final Answer<br/>trích dẫn số liệu từ Observation]
+        G{Chạm phanh Guardrail?<br/>MAX_ITERATIONS - lặp - parse}
+        G -- "Có" --> SAFE[Safe Fallback<br/>xin lỗi lịch sự, KHÔNG bịa dữ liệu]
+        G -- "Chưa" --> T
+    end
+
+    FIN --> AANS([Trả lời có bằng chứng])
+    SAFE --> AANS
+
+    %% ------------------------------------------------------------------
+    %% Chốt chặn nghiệp vụ ở tầng Tool - không tin mỗi System Prompt
+    %% ------------------------------------------------------------------
+    A2 -. "chốt chặn cứng ở tầng tool" .-> GATE[/"create_return_request bị TỪ CHỐI<br/>nếu check_return_policy chưa trả ĐỦ ĐIỀU KIỆN<br/>cho ngành hàng đó"/]
+    GATE -.-> LOOP
+
+    classDef chatbot fill:#d7f2e3,stroke:#1b7a4b,color:#0d3b24
+    classDef agent fill:#dbe7ff,stroke:#2a4d9b,color:#12224a
+    classDef guard fill:#ffe0e0,stroke:#b32d2d,color:#5c1010
+    classDef ok fill:#f3f0ff,stroke:#6b46c1,color:#2d1a5c
+
+    class C,CANS chatbot
+    class A1,A2,T,ACT,EXEC,OBS,FIN agent
+    class G,SAFE,GATE,PERR,REP,PARSE guard
+    class AANS ok
