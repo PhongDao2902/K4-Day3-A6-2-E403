@@ -119,8 +119,11 @@ class OpenRouterProvider(BaseLLMProvider):
             
             payload = {
                 "model": self.model_name,
-                "messages": messages
+                "messages": messages,
+                "temperature": 0.2,              # giảm bịa, bám format chặt hơn
+                "stop": ["\nObservation:"],      # ép model dừng ngay sau Action
             }
+
             res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=30)
             if res.status_code == 200:
                 data = res.json()
@@ -129,6 +132,44 @@ class OpenRouterProvider(BaseLLMProvider):
                 return f"[OpenRouter API Error {res.status_code}]: {res.text}"
         except Exception as e:
             return f"[OpenRouter Exception]: {str(e)}"
+
+
+class NvidiaProvider(BaseLLMProvider):
+    """NVIDIA NIM Provider (build.nvidia.com — Llama, Nemotron, Mistral...)"""
+    def __init__(self, api_key: str = None, model: str = None):
+        self.api_key = api_key or os.getenv("NVIDIA_API_KEY") or os.getenv("OPENROUTER_API_KEY")
+        self.model_name = model or os.getenv("LLM_MODEL") or "meta/llama-3.3-70b-instruct"
+
+    def generate(self, prompt: str, system_prompt: str = "") -> str:
+        if not self.api_key or not self.api_key.startswith("nvapi-"):
+            return "[NVIDIA Error]: Chưa cấu hình NVIDIA_API_KEY (key hợp lệ bắt đầu bằng 'nvapi-')!"
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            }
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+
+            payload = {
+                "model": self.model_name,
+                "messages": messages,
+                "temperature": 0.2,
+                "max_tokens": 1024,
+                "stream": False
+            }
+            res = requests.post(
+                "https://integrate.api.nvidia.com/v1/chat/completions",
+                headers=headers, json=payload, timeout=60
+            )
+            if res.status_code == 200:
+                return res.json()["choices"][0]["message"]["content"]
+            return f"[NVIDIA API Error {res.status_code}]: {res.text}"
+        except Exception as e:
+            return f"[NVIDIA Exception]: {str(e)}"
 
 
 class MockProvider(BaseLLMProvider):
@@ -152,6 +193,8 @@ def get_llm_provider(provider_name: str = None) -> BaseLLMProvider:
         return AnthropicProvider()
     elif name == "openrouter":
         return OpenRouterProvider()
+    elif name == "nvidia":
+        return NvidiaProvider()
     else:
         return MockProvider()
 
