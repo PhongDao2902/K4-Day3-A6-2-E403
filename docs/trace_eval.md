@@ -7,11 +7,11 @@
 
 | Tiêu chí | Điểm (1-5) | Lý do đánh giá |
 | :--- | :---: | :--- |
-| 🧠 **Multi-step Reasoning** | `4/5` | Cần suy luận từ tra cứu thời tiết đến chọn trang phục. |
-| 🛠️ **Tool Interaction** | `5/5` | Cần tra cứu dữ liệu thời gian thực qua API thời tiết/chuyến bay. |
-| 🔀 **Dynamic Decision** | `4/5` | Kết quả bước trước quyết định hành động bước sau. |
-| ⏳ **Long Horizon** | `3/5` | Quy trình gồm 2-3 bước xử lý ngắn. |
-| **TỔNG ĐIỂM FIT** | **16/20** | **KẾT LUẬN: BÀI TOÁN RẤT NÊN DÙNG REACT AGENT!** |
+| 🧠 **Multi-step Reasoning** | `5/5` | Cần suy luận qua nhiều bước: xác minh khách hàng, kiểm tra đơn hàng, đánh giá điều kiện đổi trả, xác định phương án xử lý (đổi hàng, trả hàng hoặc hoàn tiền). |
+| 🛠️ **Tool Interaction** | `5/5` | Cần tương tác với nhiều hệ thống như Order Management, Inventory, Payment, Shipping và Notification thông qua API để tra cứu và thực hiện hành động. |
+| 🔀 **Dynamic Decision** | `5/5` | Mỗi bước phụ thuộc vào kết quả trước đó. Ví dụ, nếu đơn hàng quá thời hạn đổi trả hoặc sản phẩm không đủ điều kiện, agent sẽ chuyển sang tư vấn hoặc chuyển tiếp cho nhân viên thay vì tiếp tục quy trình. |
+| ⏳ **Long Horizon** | `4/5` | Quy trình gồm nhiều bước và có thể kéo dài từ lúc khách gửi yêu cầu đến khi hoàn tất đổi trả, bao gồm theo dõi trạng thái hoàn tiền hoặc giao sản phẩm mới. |
+| **TỔNG ĐIỂM FIT** | **19/20** | **KẾT LUẬN: BÀI TOÁN RẤT NÊN DÙNG REACT AGENT!** |
 
 ---
 
