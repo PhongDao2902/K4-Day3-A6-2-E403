@@ -131,6 +131,58 @@ class OpenRouterProvider(BaseLLMProvider):
             return f"[OpenRouter Exception]: {str(e)}"
 
 
+class NvidiaProvider(BaseLLMProvider):
+    """
+    NVIDIA NIM Provider (build.nvidia.com).
+    NIM expose endpoint tương thích chuẩn OpenAI nên dùng lại SDK openai, chỉ đổi base_url.
+    Mặc định dùng model z-ai/glm-5.2.
+    """
+    DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1"
+
+    def __init__(self, api_key: str = None, model: str = None, base_url: str = None):
+        self.api_key = api_key or os.getenv("NVIDIA_API_KEY")
+        self.model_name = model or os.getenv("LLM_MODEL") or "z-ai/glm-5.2"
+        self.base_url = base_url or os.getenv("NVIDIA_BASE_URL") or self.DEFAULT_BASE_URL
+
+    def generate(self, prompt: str, system_prompt: str = "") -> str:
+        if not self.api_key or self.api_key.startswith("your_"):
+            return "[NVIDIA Error]: Chưa cấu hình NVIDIA_API_KEY trong file .env!"
+        try:
+            import openai
+            # timeout: chặn trường hợp request treo làm đứng cả vòng lặp ReAct
+            client = openai.OpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url,
+                timeout=90.0,
+                max_retries=2,
+            )
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+
+            response = client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                max_tokens=4096,
+            )
+            message = response.choices[0].message
+            content = (message.content or "").strip()
+
+            # GLM là model suy luận: phần suy nghĩ nằm ở reasoning_content, câu trả lời
+            # thật nằm ở content. Nếu hết token trước khi kịp viết content thì báo rõ
+            # thay vì trả chuỗi rỗng làm parser của Agent hiểu nhầm thành lỗi định dạng.
+            if not content:
+                reasoning = getattr(message, "reasoning_content", None)
+                if reasoning:
+                    return ("[NVIDIA Error]: Model chỉ trả về phần suy luận, chưa kịp viết "
+                            "câu trả lời. Hãy tăng max_tokens.")
+                return "[NVIDIA Error]: Model trả về nội dung rỗng."
+            return content
+        except Exception as e:
+            return f"[NVIDIA Exception]: {str(e)}"
+
+
 class MockProvider(BaseLLMProvider):
     """Offline Mock Provider (Cho bài test không cần kết nối API)"""
     def generate(self, prompt: str, system_prompt: str = "") -> str:
@@ -152,6 +204,8 @@ def get_llm_provider(provider_name: str = None) -> BaseLLMProvider:
         return AnthropicProvider()
     elif name == "openrouter":
         return OpenRouterProvider()
+    elif name == "nvidia":
+        return NvidiaProvider()
     else:
         return MockProvider()
 
