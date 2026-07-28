@@ -119,7 +119,9 @@ class OpenRouterProvider(BaseLLMProvider):
             
             payload = {
                 "model": self.model_name,
-                "messages": messages
+                "messages": messages,
+                "temperature": 0.2,              # giảm bịa, bám format chặt hơn
+                "stop": ["\nObservation:"],      # ép model dừng ngay sau Action
             }
             res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=30)
             if res.status_code == 200:
@@ -165,6 +167,8 @@ class NvidiaProvider(BaseLLMProvider):
                 model=self.model_name,
                 messages=messages,
                 max_tokens=4096,
+                temperature=0.2,             # giảm bịa, bám format ReAct chặt hơn
+                stop=["\nObservation:"],     # ép model dừng ngay sau dòng Action
             )
             message = response.choices[0].message
             content = (message.content or "").strip()
