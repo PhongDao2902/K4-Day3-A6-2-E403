@@ -9,6 +9,8 @@ Cách chạy:
     python src/app.py --case 4        # chỉ chạy test case số 4
     python src/app.py --mode agent    # chỉ chạy ReAct Agent
     python src/app.py --ask "Đơn DH20260715 còn đổi trả được không?"
+    python src/app.py --chat             # hỏi đáp trực tiếp, dùng khi demo / chấm chéo
+    python src/app.py --chat --mode agent
     python src/app.py --trace-out docs/trace_raw.md    # xuất toàn bộ log trace ra file
 """
 
@@ -81,6 +83,42 @@ _RETRY_DELAY_RE = re.compile(r"'retryDelay':\s*'(\d+)", re.IGNORECASE)
 _RETRY_IN_RE = re.compile(r"retry in ([\d.]+)s", re.IGNORECASE)
 
 
+# ==========================================================================================
+# ĐO CHI PHÍ — ước lượng token và tiền đã tiêu, để không vượt ngân sách khi test
+# ==========================================================================================
+
+# providers.py chỉ trả về chuỗi text, không trả usage của nhà cung cấp, nên ở đây ước lượng
+# theo số ký tự. Với tiếng Việt, trung bình khoảng 3 ký tự cho 1 token.
+CHARS_PER_TOKEN = 3.0
+
+# Giá USD cho mỗi 1 triệu token (input, output). Tra tại trang giá của từng nhà cung cấp.
+PRICE_PER_MTOK = {
+    "gpt-5-mini": (0.25, 2.00),
+    "gemini-2.5-flash": (0.30, 2.50),
+    "gemini-3.5-flash-lite": (0.30, 2.50),
+}
+
+USAGE = {"in_chars": 0, "out_chars": 0, "calls": 0}
+
+
+def report_usage(model_name: str) -> None:
+    """In ước lượng token và chi phí của cả phiên chạy."""
+    tok_in = USAGE["in_chars"] / CHARS_PER_TOKEN
+    tok_out = USAGE["out_chars"] / CHARS_PER_TOKEN
+    log(f"\nĐã gọi LLM {USAGE['calls']} lần | Ước lượng {tok_in:,.0f} token vào, "
+        f"{tok_out:,.0f} token ra")
+
+    price = next((v for k, v in PRICE_PER_MTOK.items() if k in str(model_name)), None)
+    if price is None:
+        log(f"Chưa có bảng giá cho model '{model_name}' nên không ước lượng được chi phí.")
+        return
+    cost = tok_in / 1e6 * price[0] + tok_out / 1e6 * price[1]
+    log(f"Ước lượng chi phí lần chạy này: ${cost:.4f} "
+        f"(giá {price[0]}/{price[1]} USD mỗi 1M token vào/ra)")
+    log("Đây chỉ là ước lượng theo số ký tự. Số tiền chính xác xem ở trang usage "
+        "của nhà cung cấp.")
+
+
 def _is_transient_error(text: str) -> bool:
     if not text or "Exception]" not in text and "Error]" not in text:
         return False
@@ -108,6 +146,11 @@ def call_llm(provider, prompt: str, system_prompt: str = "") -> str:
 
         last = provider.generate(prompt, system_prompt=system_prompt)
         _last_call_at[0] = time.monotonic()
+
+        USAGE["calls"] += 1
+        USAGE["in_chars"] += len(prompt) + len(system_prompt or "")
+        USAGE["out_chars"] += len(last or "")
+
         if not _is_transient_error(last):
             return last
         if attempt == MAX_LLM_RETRIES:
@@ -384,8 +427,53 @@ def print_summary(results):
     log("=" * 92)
 
 
+def run_chat(provider, model_name: str, mode: str = "both") -> None:
+    """
+    Chế độ hỏi đáp trực tiếp, dùng cho buổi Cross-Audit ở Mốc 4: nhóm khác gõ thẳng câu
+    bẫy vào đây, không phải sửa file test_cases.json rồi chạy lại.
+    Mỗi câu hỏi là một phiên độc lập (Agent không nhớ lượt trước).
+    """
+    log("\n" + "=" * 92)
+    log("CHẾ ĐỘ HỎI ĐÁP TRỰC TIẾP")
+    log("Gõ câu hỏi rồi Enter. Gõ 'thoat' để kết thúc và xem tổng kết.")
+    log("=" * 92)
+
+    results = []
+    turn = 0
+    while True:
+        try:
+            # lstrip BOM: terminal Windows đôi khi chèn ký tự ﻿ vào đầu dòng nhập
+            question = input("\nBạn hỏi > ").lstrip("﻿").strip()
+        except (EOFError, KeyboardInterrupt):
+            log("\nĐã dừng phiên hỏi đáp.")
+            break
+
+        if not question:
+            continue
+        if question.lower() in ("thoat", "thoát", "exit", "quit", "q"):
+            break
+
+        turn += 1
+        log("\n" + "#" * 92)
+        log(f"# LƯỢT {turn}: {question}")
+        log("#" * 92)
+
+        if mode in ("chatbot", "both"):
+            log("\n--- CHATBOT BASELINE ---")
+            results.append((f"L{turn}", run_baseline_chatbot(question, provider)))
+        if mode in ("agent", "both"):
+            log("\n--- REACT AGENT ---")
+            results.append((f"L{turn}", run_react_agent(question, provider)))
+
+    if results:
+        print_summary(results)
+        report_usage(model_name)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Lab 03 — Chatbot vs ReAct Agent")
+    parser.add_argument("--chat", action="store_true",
+                        help="Chế độ hỏi đáp trực tiếp, dùng khi demo và chấm chéo")
     parser.add_argument("--case", type=int, help="Chỉ chạy 1 test case theo id")
     parser.add_argument("--mode", choices=["chatbot", "agent", "both"], default="both")
     parser.add_argument("--ask", type=str, help="Chạy trên một câu hỏi tự nhập")
@@ -403,6 +491,10 @@ def main():
     log(f"Tool đã đăng ký ({len(AVAILABLE_TOOLS)}): {', '.join(AVAILABLE_TOOLS)}")
     log(f"Guardrails: MAX_ITERATIONS={MAX_ITERATIONS}, "
         f"MAX_REPEATED_ACTIONS={MAX_REPEATED_ACTIONS}, TIMEOUT={TIMEOUT_SECONDS}s")
+
+    if args.chat:
+        run_chat(provider, model_name, args.mode)
+        return
 
     if args.ask:
         cases = [{"id": 0, "category": "Câu hỏi tự nhập", "question": args.ask}]
@@ -433,6 +525,7 @@ def main():
             results.append((case["id"], run_react_agent(case["question"], provider)))
 
     print_summary(results)
+    report_usage(model_name)
 
     if args.trace_out:
         out_path = args.trace_out if os.path.isabs(args.trace_out) \
